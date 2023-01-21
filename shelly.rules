@@ -1,0 +1,37 @@
+-- Mem1: Last time zigbee2mqtt responded with to the health check
+-- Mem2: Current availability of target lamp
+-- Mem3: Last zigbee state
+-- Mem4: Last relay state
+
+-- Only virtual
+SetOption114 1
+
+
+-- zigbee2mqtt availability
+Rule1
+    ON mqtt#connected DO Subscribe health_response, zigbee2mqtt/bridge/response/health_check, data.healthy ENDON
+    ON Time#Minute DO publish zigbee2mqtt/bridge/request/health_check ENDON
+    ON Event#health_response DO if (%value%==true) Mem1=LOCALTIME+70 endif ENDON
+    ON Mqtt#Disconnected DO Mem1 0 ENDON
+    ON Wifi#Disconnected DO Mem1 0 ENDON
+
+-- Lamp availability
+Rule2
+    ON mqtt#connected DO Subscribe availability,$TOPIC$/availability,state ENDON
+    ON mqtt#disconnected DO Mem2 0 ENDON
+    ON Event#availability DO if (%value%=online) Mem2 1 elseif (%value%=offline) Mem2 0 endif ENDON
+
+-- Control power and caching
+Rule3
+    ON Switch1#State=2 DO if ((Mem2==1) AND (Mem1>=LOCALTIME) AND (Mem4==1)) publish $TOPIC$/set {"state":"toggle"} else event offline=1 endif ENDON
+    ON Event#offline DO if ((Mem4==1) AND (Mem3==1)) backlog Power off; Mem3 0 endif ENDON
+    ON Event#offline DO if ((Mem4==1) AND (Mem3==0)) backlog Power off; delay 10; Power on; Mem3 1 endif ENDON
+    ON Event#offline DO if ((Mem4==0) AND (Mem3==1)) Mem3 0 endif ENDON
+    ON Event#offline DO if ((Mem4==0) AND (Mem3==0)) backlog Power on; Mem3 1 endif ENDON
+    ON mqtt#connected DO Subscribe2 zigbee_state, $TOPIC$, state ENDON
+    ON Event#zigbee_state DO if (%value%=ON) Mem3 1 elseif (%value%=OFF) Mem3 0 endif ENDON
+    ON System#Init DO Mem3 0 ENDON
+    ON Power1#Boot DO if (%value%==1) Mem4 1 else Mem4 0 endif ENDON
+    ON Power1#state DO if (%value%==1) Mem4 1 else Mem4 0 endif ENDON
+
+backlog Rule1 1; Rule2 1; Rule3 1
