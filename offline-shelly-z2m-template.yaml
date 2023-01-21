@@ -1,0 +1,264 @@
+substitutions:
+  name: "offline-shelly"
+  light: "zigbee2mqtt/some/lamp"
+  platform: "ESP8266"
+  board: "esp01_1m"
+  ap_pw: "wX8h4hcrB6sa"
+
+esphome:
+  name: "${name}"
+  platform: "${platform}"
+  board: "${board}"
+  name_add_mac_suffix: true
+
+dashboard_import:
+  package_import_url: github://TheNoim/OfflineShelly/offline-shelly-z2m-template.yaml@main
+  import_full_config: false # or true
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "${name}"
+    password: "${ap_pw}"
+
+captive_portal:
+
+output:
+  - platform: gpio
+    pin: GPIO5
+    id: shelly_1l_relay
+
+light:
+  - platform: binary
+    name: ${name}_light
+    output: shelly_1l_relay
+    id: lightid
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO4
+    name: ${name}_switch_1
+    on_state:
+      then:
+        - script.execute: toggle_light
+    id: switchid1
+    filters:
+      - delayed_on_off: 50ms
+  - platform: gpio
+    pin:
+      number: GPIO14
+    name: ${name}_switch_2
+
+sensor:
+  - platform: ntc
+    sensor: temp_resistance_reading
+    name: ${name}_temperature
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    icon: "mdi:thermometer"
+    calibration:
+      b_constant: 3350
+      reference_resistance: 10kOhm
+      reference_temperature: 298.15K
+    on_value_range:
+      - above: "80.0"
+        then:
+          - light.turn_off: lightid
+  - platform: resistance
+    id: temp_resistance_reading
+    sensor: temp_analog_reading
+    configuration: DOWNSTREAM
+    resistor: 32kOhm
+  - platform: adc
+    id: temp_analog_reading
+    pin: A0
+
+status_led:
+  pin: GPIO0
+
+### Automation part
+
+globals:
+  - id: is_available
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: received_healthy
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: light_is_available
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: last_light_state
+    type: bool
+    restore_value: yes
+    initial_value: "true"
+
+script:
+  # Update id(is_available)
+  - id: check_zigbee2mqtt_availability
+    then:
+      - if:
+          condition:
+            mqtt.connected:
+          then:
+            - globals.set:
+                id: received_healthy
+                value: "false"
+            - mqtt.publish:
+                topic: zigbee2mqtt/bridge/request/health_check
+                payload: ""
+            - wait_until:
+                timeout: 5s
+                condition:
+                  lambda: return id(received_healthy) == true;
+            - if:
+                condition:
+                  lambda: return id(received_healthy) == true;
+                then:
+                  - globals.set:
+                      id: is_available
+                      value: "true"
+                else:
+                  - globals.set:
+                      id: is_available
+                      value: "false"
+          else:
+            - lambda: id(is_available) = false;
+  # Toggle light
+  - id: toggle_light
+    then:
+      if:
+        condition:
+          - lambda: |-
+              ESP_LOGD("toggle_light", "is_available = %s", id(is_available) ? "true" : "false");
+              return id(is_available) == true;
+          - lambda: |-
+              ESP_LOGD("toggle_light", "light_is_available = %s", id(light_is_available) ? "true" : "false");
+              return id(light_is_available) == true;
+        then:
+          mqtt.publish_json:
+            topic: "${light}/set"
+            payload: |-
+              root["state"] = "toggle";
+        else:
+          if:
+            condition:
+              lambda: |-
+                ESP_LOGD("toggle_light", "last_light_state = %s", id(last_light_state) ? "true" : "false");
+                return id(last_light_state) == true;
+            then:
+              light.turn_on:
+                id: lightid
+            else:
+              if:
+                condition:
+                  light.is_on: lightid
+                then:
+                  - lambda: ESP_LOGD("toggle_light", "OFF -> ON sequence");
+                  - light.turn_off:
+                      id: lightid
+                  - delay: 1s
+                  - light.turn_on:
+                      id: lightid
+                else:
+                  - lambda: ESP_LOGD("toggle_light", "light.turn_on");
+                  - light.turn_on:
+                      id: lightid
+
+# Check availability
+interval:
+  - interval: 1min
+    then:
+      - script.execute: check_zigbee2mqtt_availability
+
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_user
+  password: !secret mqtt_password
+  port: !secret mqtt_port
+  on_connect:
+    - script.execute: check_zigbee2mqtt_availability
+  on_disconnect:
+    - script.execute: check_zigbee2mqtt_availability
+  on_json_message:
+    # Health check response handling
+    - topic: zigbee2mqtt/bridge/response/health_check
+      then:
+        if:
+          condition:
+            lambda: |-
+              ESP_LOGD("health_check", "Received health_check response");
+              if (x.containsKey("data")) {
+                if (x["data"].containsKey("healthy")) {
+                  return x["data"]["healthy"];
+                }
+                return false;
+              }
+              return false;
+          then:
+            - globals.set:
+                id: received_healthy
+                value: "true"
+            - lambda: ESP_LOGD("health_check", "Set received_healthy to true");
+          else:
+            - globals.set:
+                id: received_healthy
+                value: "false"
+            - lambda: ESP_LOGD("health_check", "Set received_healthy to false");
+    # Light availability response handling
+    - topic: "${light}/availability"
+      then:
+        if:
+          condition:
+            lambda: |-
+              ESP_LOGD("availability", "Received availability");
+              if (x.containsKey("state")) {
+                return x["state"] == "online";
+              }
+              return false;
+          then:
+            - globals.set:
+                id: light_is_available
+                value: "true"
+            - lambda: ESP_LOGD("availability", "Set light_is_available to true");
+          else:
+            - globals.set:
+                id: light_is_available
+                value: "false"
+            - lambda: ESP_LOGD("availability", "Set light_is_available to false");
+    # Light state handling
+    - topic: "${light}"
+      then:
+        if:
+          condition:
+            lambda: |-
+              ESP_LOGD("light_state", "Received light_state");
+              if (x.containsKey("state")) {
+                return x["state"] == "ON";
+              }
+              return false;
+          then:
+            - globals.set:
+                id: last_light_state
+                value: "true"
+            - lambda: ESP_LOGD("light_state", "Set last_light_state to true");
+          else:
+            - globals.set:
+                id: last_light_state
+                value: "false"
+            - lambda: ESP_LOGD("light_state", "Set last_light_state to false");

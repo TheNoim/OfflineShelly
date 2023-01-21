@@ -1,2 +1,0 @@
-
-Rule3 +ON Switch2#State=2 DO publish zigbee2mqtt/Flur/Deckenlicht/set {"state":"toggle"} ENDON
