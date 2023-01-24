@@ -172,13 +172,22 @@ script:
                   - lambda: ESP_LOGD("toggle_light", "OFF -> ON sequence");
                   - light.turn_off:
                       id: lightid
+                  - globals.set:
+                      id: last_light_state
+                      value: "false"
                   - delay: 1s
                   - light.turn_on:
                       id: lightid
+                  - globals.set:
+                      id: last_light_state
+                      value: "true"
                 else:
                   - lambda: ESP_LOGD("toggle_light", "light.turn_on");
                   - light.turn_on:
                       id: lightid
+                  - globals.set:
+                      id: last_light_state
+                      value: "false"
 
 # Check availability
 interval:
