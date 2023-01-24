@@ -1,6 +1,8 @@
 substitutions:
   name: "offline-shelly"
   # light: "zigbee2mqtt/some/lamp"
+  zigbee_health_check: "zigbee2mqtt/bridge/response/health_check"
+  zigbee_health_check_request: "zigbee2mqtt/bridge/request/health_check"
   relay_pin: GPIO5
   switch_1_pin: GPIO4
   switch_2_pin: GPIO14
@@ -9,9 +11,6 @@ substitutions:
 dashboard_import:
   package_import_url: github://TheNoim/OfflineShelly/offline-shelly-z2m-template.yaml@main
   import_full_config: false # or true
-
-# Enable logging
-logger:
 
 output:
   - platform: gpio
@@ -99,7 +98,7 @@ script:
                 id: received_healthy
                 value: "false"
             - mqtt.publish:
-                topic: zigbee2mqtt/bridge/request/health_check
+                topic: ${zigbee_health_check_request}
                 payload: ""
             - wait_until:
                 timeout: 5s
@@ -181,7 +180,7 @@ mqtt:
     - script.execute: check_zigbee2mqtt_availability
   on_json_message:
     # Health check response handling
-    - topic: zigbee2mqtt/bridge/response/health_check
+    - topic: ${zigbee_health_check}
       then:
         if:
           condition:
