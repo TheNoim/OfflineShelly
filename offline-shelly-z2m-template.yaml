@@ -1,9 +1,13 @@
 substitutions:
   name: "offline-shelly"
-  light: "zigbee2mqtt/some/lamp"
+  # light: "zigbee2mqtt/some/lamp"
   platform: "ESP8266"
   board: "esp01_1m"
   ap_pw: "wX8h4hcrB6sa"
+  relay_pin: GPIO5
+  switch_1_pin: GPIO4
+  switch_2_pin: GPIO14
+  status_led_pin: GPIO0
 
 esphome:
   name: "${name}"
@@ -36,7 +40,7 @@ captive_portal:
 
 output:
   - platform: gpio
-    pin: GPIO5
+    pin: ${relay_pin}
     id: shelly_1l_relay
 
 light:
@@ -48,7 +52,7 @@ light:
 binary_sensor:
   - platform: gpio
     pin:
-      number: GPIO4
+      number: ${switch_1_pin}
     name: ${name}_switch_1
     on_state:
       then:
@@ -58,7 +62,7 @@ binary_sensor:
       - delayed_on_off: 50ms
   - platform: gpio
     pin:
-      number: GPIO14
+      number: ${switch_2_pin}
     name: ${name}_switch_2
 
 sensor:
@@ -86,7 +90,7 @@ sensor:
     pin: A0
 
 status_led:
-  pin: GPIO0
+  pin: ${status_led_pin}
 
 ### Automation part
 
