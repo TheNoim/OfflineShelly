@@ -1,19 +1,10 @@
 substitutions:
   name: "offline-shelly"
   # light: "zigbee2mqtt/some/lamp"
-  platform: "ESP8266"
-  board: "esp01_1m"
-  ap_pw: "wX8h4hcrB6sa"
   relay_pin: GPIO5
   switch_1_pin: GPIO4
   switch_2_pin: GPIO14
   status_led_pin: GPIO0
-
-esphome:
-  name: "${name}"
-  platform: "${platform}"
-  board: "${board}"
-  name_add_mac_suffix: true
 
 dashboard_import:
   package_import_url: github://TheNoim/OfflineShelly/offline-shelly-z2m-template.yaml@main
@@ -21,22 +12,6 @@ dashboard_import:
 
 # Enable logging
 logger:
-
-# Enable Home Assistant API
-api:
-
-ota:
-
-wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
-
-  # Enable fallback hotspot (captive portal) in case wifi connection fails
-  ap:
-    ssid: "${name}"
-    password: "${ap_pw}"
-
-captive_portal:
 
 output:
   - platform: gpio
@@ -200,10 +175,6 @@ interval:
       - script.execute: check_zigbee2mqtt_availability
 
 mqtt:
-  broker: !secret mqtt_broker
-  username: !secret mqtt_user
-  password: !secret mqtt_password
-  port: !secret mqtt_port
   on_connect:
     - script.execute: check_zigbee2mqtt_availability
   on_disconnect:
