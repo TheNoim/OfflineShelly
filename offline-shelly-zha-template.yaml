@@ -1,6 +1,6 @@
 substitutions:
   name: "offline-shelly"
-  # light: "zigbee2mqtt/some/lamp"
+  # light: "light.some_hass_light"
   hass_service: "light"
   relay_pin: GPIO5
   switch_1_pin: GPIO4
@@ -37,11 +37,11 @@ binary_sensor:
     pin:
       number: ${switch_2_pin}
     name: ${name}_switch_2
-    on_state:
-      then:
-        - lambda: |-
-            ESP_LOGD("last_state", "x = %s", x);
-            id(last_light_state) = x
+    # on_state:
+    #   then:
+    #     - lambda: |-
+    #         ESP_LOGD("last_state", "x = %s", x);
+    #         id(last_light_state) = x;
 
   - platform: homeassistant
     entity_id: ${light}
@@ -56,13 +56,25 @@ text_sensor:
     internal: true
     on_raw_value:
       then:
-        - lambda: |-
-            ESP_LOGD("hass_light_state", "state = %s", id(hass_light_state).state);
-            if (id(hass_light_state).state == "on" || id(hass_light_state).state == "off") {
-              id(light_is_available) = true;
-            } else {
-              id(light_is_available) = false;
-            }
+        if:
+          condition:
+            or:
+              - text_sensor.state:
+                  id: hass_light_state
+                  state: "on"
+              - text_sensor.state:
+                  id: hass_light_state
+                  state: "off"
+          then:
+            - lambda: ESP_LOGD("hass_light_state", "light_is_available = true");
+            - globals.set:
+                id: light_is_available
+                value: "true"
+          else:
+            - lambda: ESP_LOGD("hass_light_state", "light_is_available = false");
+            - globals.set:
+                id: light_is_available
+                value: "false"
 
 sensor:
   - platform: ntc
