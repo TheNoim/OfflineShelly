@@ -66,12 +66,12 @@ text_sensor:
                   id: hass_light_state
                   state: "off"
           then:
-            - lambda: ESP_LOGD("hass_light_state", "light_is_available = true");
+            - lambda: ESP_LOGD("hass_light_state", "light_is_available = true %s", id(hass_light_state).state.c_str());
             - globals.set:
                 id: light_is_available
                 value: "true"
           else:
-            - lambda: ESP_LOGD("hass_light_state", "light_is_available = false");
+            - lambda: ESP_LOGD("hass_light_state", "light_is_available = false %s", id(hass_light_state).state.c_str());
             - globals.set:
                 id: light_is_available
                 value: "false"
