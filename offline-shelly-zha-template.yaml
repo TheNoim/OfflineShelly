@@ -54,7 +54,6 @@ text_sensor:
     entity_id: ${light}
     id: hass_light_state
     internal: true
-    publish_initial_state: true
     on_raw_value:
       then:
         - lambda: |-
@@ -124,9 +123,9 @@ script:
                 value: '"off"'
           else:
             - homeassistant.service:
-              service: ${hass_service}.turn_on
-              data:
-                entity_id: ${light}
+                service: ${hass_service}.turn_on
+                data:
+                  entity_id: ${light}
             - globals.set:
                 id: desired_state
                 value: '"on"'
@@ -178,7 +177,7 @@ script:
         else:
           # Relay was off, just turn the relay on again
           - light.turn_on:
-            id: lightid
+              id: lightid
           - globals.set:
               id: last_light_state
               value: "true"
