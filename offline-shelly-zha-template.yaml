@@ -11,6 +11,11 @@ dashboard_import:
   package_import_url: github://TheNoim/OfflineShelly/offline-shelly-zha-template.yaml@main
   import_full_config: false # or true
 
+esphome:
+  project:
+    name: "OfflineShelly"
+    version: "1.0.0"
+
 output:
   - platform: gpio
     pin: ${relay_pin}
