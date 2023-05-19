@@ -13,7 +13,7 @@ dashboard_import:
 
 esphome:
   project:
-    name: "OfflineShelly"
+    name: "noim.offlineshelly"
     version: "1.0.0"
 
 output:
