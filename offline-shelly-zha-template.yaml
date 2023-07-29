@@ -32,7 +32,7 @@ binary_sensor:
     pin:
       number: ${switch_1_pin}
     name: ${name}_switch_1
-    on_state:
+    on_press:
       then:
         - script.execute: toggle_light
     id: switchid1
