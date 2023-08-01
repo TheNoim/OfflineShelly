@@ -26,6 +26,7 @@ light:
     name: ${name}_light
     output: shelly_1l_relay
     id: lightid
+    restore_mode: RESTORE_DEFAULT_ON
 
 binary_sensor:
   - platform: gpio
