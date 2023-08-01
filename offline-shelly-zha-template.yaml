@@ -39,6 +39,9 @@ binary_sensor:
     on_press:
       then:
         - script.execute: toggle_light
+    on_release:
+      then:
+        - script.execute: toggle_light
     id: switchid1
     filters:
       - delayed_on_off: 50ms
