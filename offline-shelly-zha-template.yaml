@@ -21,6 +21,9 @@ output:
     pin: ${relay_pin}
     id: shelly_1l_relay
 
+wifi:
+  reboot_timeout: 0s
+
 light:
   - platform: binary
     name: ${name}_light
