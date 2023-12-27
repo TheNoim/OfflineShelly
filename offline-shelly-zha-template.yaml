@@ -45,10 +45,10 @@ binary_sensor:
     id: switchid1
     filters:
       - delayed_on_off: 50ms
-  - platform: gpio
-    pin:
-      number: ${switch_2_pin}
-    name: ${name}_switch_2
+  #- platform: gpio
+    #pin:
+    #  number: ${switch_2_pin}
+    #name: ${name}_switch_2
     # on_state:
     #   then:
     #     - lambda: |-
