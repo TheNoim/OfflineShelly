@@ -1,0 +1,114 @@
+# MARK: Last known state
+switch:
+  - name: "${prefix} last known state"
+    restore_mode: RESTORE_DEFAULT_OFF
+    id: ${prefix}_last_known_state
+    internal: false
+    optimistic: true
+    platform: template
+  - id: !extend ${relay_id}
+    on_turn_off:
+      then:
+        switch.turn_off: ${prefix}_last_known_state
+
+# MARK: HASS Entity
+text_sensor:
+  - platform: homeassistant
+    id: ${prefix}_zigbee_device
+    entity_id: ${zigbee_entity}
+    name: ${prefix} zigbee device state
+    internal: false
+    on_value:
+      then:
+        - logger.log: "Update hass state for ${prefix}"
+        - if:
+            # Only update last known state if current state is not unavailable
+            condition:
+              lambda: 'return x != "unavailable";'
+            then:
+              # update last known state with current known state
+              if:
+                condition:
+                  lambda: 'return x == "on";'
+                then:
+                  switch.turn_on: ${prefix}_last_known_state
+                else:
+                  switch.turn_off: ${prefix}_last_known_state
+
+
+script:
+  # MARK: Offline toggle
+  - id: ${prefix}_offline_toggle
+    mode: queued
+    then:
+      - if:
+          condition:
+            lambda: 'return id(${prefix}_last_known_state).state == true;'
+          then:
+            # Last state == on
+            - logger.log: "Last state == 'on' for ${prefix}"
+            - switch.turn_off: ${relay_id}
+            - switch.turn_off: ${prefix}_last_known_state
+          else:
+            # Last state == off
+            - logger.log: "Last state == 'off' for ${prefix}"
+            - switch.turn_off: ${relay_id}
+            - delay: 1s
+            - switch.turn_on: ${relay_id}
+            - switch.turn_on: ${prefix}_last_known_state
+
+  # MARK: normal toggle
+  - id: ${prefix}_toggle
+    mode: queued
+    then:
+      - if:
+          condition:
+            api.connected:
+          else:
+            - logger.log: "api not connected. Go offline route for ${prefix}"
+            - script.execute: ${prefix}_offline_toggle
+          then:
+            if:
+              condition:
+                lambda: 'return id(${prefix}_zigbee_device).state == "unavailable";'
+              then:
+                - logger.log: "Zigbee state for ${prefix} is 'unavailable'. Go offline route."
+                - script.execute: ${prefix}_offline_toggle
+              else:
+                if:
+                  condition:
+                    lambda: 'return id(${prefix}_zigbee_device).state == "on";'
+                  # is on
+                  then:
+                    - logger.log: "Go on route for ${prefix}. Try to turn off."
+                    - homeassistant.action:
+                        action: homeassistant.turn_off
+                        data:
+                          entity_id: ${zigbee_entity}
+                    - wait_until:
+                        condition:
+                          lambda: 'return id(${prefix}_zigbee_device).state == "off";'
+                        timeout: 2s
+                    - if:
+                        condition:
+                          lambda: 'return id(${prefix}_zigbee_device).state == "on" || id(${prefix}_zigbee_device).state == "unavailable";'
+                        then:
+                          - logger.log: "State for ${prefix} didn't change. Go offline route"
+                          - script.execute: ${prefix}_offline_toggle
+                  # is off
+                  else:
+                    - logger.log: "Go off route for ${prefix}. Try to turn on."
+                    - homeassistant.action:
+                        action: homeassistant.turn_on
+                        data:
+                          entity_id: ${zigbee_entity}
+                    - wait_until:
+                        condition:
+                          lambda: 'return id(${prefix}_zigbee_device).state == "on";'
+                        timeout: 2s
+                    - if:
+                        condition:
+                          lambda: 'return id(${prefix}_zigbee_device).state == "off" || id(${prefix}_zigbee_device).state == "unavailable";'
+                        then:
+                          - logger.log: "State for ${prefix} didn't change. Go offline route"
+                          - script.execute: ${prefix}_offline_toggle
